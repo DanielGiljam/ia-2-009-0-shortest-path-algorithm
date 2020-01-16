@@ -1,17 +1,22 @@
 package com.danielgiljam.ia_2_009_0_pathfinder;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 class Node {
 
     private final String name;
     private final GeoCoordinate location;
-    private final Neighbours neighbours = new Neighbours();
-    private final RoutingTable routingTable = new RoutingTable();
+    private final Neighbours neighbours;
+    private final RoutingTable routingTable;
+
+    private CompletableFuture<Void> routingTableBroadcast;
 
     Node(final String name, final double latitude, final double longitude) {
         this.name = name;
         location = new GeoCoordinate(latitude, longitude);
+        neighbours = new Neighbours();
+        routingTable = new RoutingTable(this);
     }
 
     String getName() {
@@ -24,6 +29,40 @@ class Node {
 
     void addNeighbour(final Node node) {
         neighbours.put(node);
+        node.neighbours.put(this);
+    }
+
+    private void broadcastRoutingTable() {
+        routingTableBroadcast = CompletableFuture.supplyAsync(
+                () -> {
+                    RoutingTable neighboursRoutingTable;
+                    double distance;
+                    List<Node> hops;
+                    for (Neighbours.Neighbour neighbour : neighbours.values()) {
+                        neighboursRoutingTable = neighbour.node.routingTable;
+                        boolean newRoutesWereAdded = false;
+                        for (final RoutingTable.Route route : routingTable.values()) {
+                            distance = route.distance + neighbour.distance;
+                            if (neighboursRoutingTable.accepts(route.name, distance)) {
+                                hops = new ArrayList<>(route.hops);
+                                hops.add(this);
+                                neighboursRoutingTable.put(route.node, hops, distance);
+                                newRoutesWereAdded = true;
+                            }
+                        }
+                        if (newRoutesWereAdded) neighbour.node.broadcastRoutingTable();
+                    }
+                    return null;
+                }
+        );
+    }
+
+    static boolean routingTablesAreReady(final List<Node> nodes) {
+        boolean ready = true;
+        for (final Node node : nodes) {
+            if (node.routingTableBroadcast != null && !node.routingTableBroadcast.isDone()) ready = false;
+        }
+        return ready;
     }
 
     private static class NodeWrapper {
@@ -39,10 +78,6 @@ class Node {
 
     private class Neighbours extends HashMap<String, Neighbours.Neighbour> {
 
-        Neighbours(final Neighbours neighbours) {
-            super(neighbours);
-        }
-
         Neighbours() {
             super();
         }
@@ -53,25 +88,30 @@ class Node {
 
         private class Neighbour extends NodeWrapper {
 
-            Neighbour(Node node) {
+            Neighbour(final Node node) {
                 super(node, GeoCoordinate.getDistance(location, node.location));
-                routingTable.put(node, node, this.distance);
+                if (routingTable.accepts(node.name, this.distance)) routingTable.put(node, node, this.distance);
+                broadcastRoutingTable();
             }
         }
     }
 
     private static class RoutingTable extends HashMap<String, RoutingTable.Route> {
 
-        private RoutingTable(final RoutingTable routingTable) {
-            super(routingTable);
+        private RoutingTable(final Node node) {
+            this.put(node.name, new Route(node, new ArrayList<>(), 0));
         }
 
-        private RoutingTable() {
-            super();
+        private void put(final Node destination, final Node nextHop, final double distance) {
+            super.put(destination.name, new Route(destination, nextHop, distance));
         }
 
-        private void put(final Node nextHop, final Node destination, final double distance) {
-            super.put(destination.name, new Route(nextHop, destination, distance));
+        private void put(final Node destination, final List<Node> hops, final double distance) {
+            super.put(destination.name, new Route(destination, hops, distance));
+        }
+
+        private boolean accepts(final String key, final double distance) {
+            return !this.containsKey(key) || distance < this.get(key).distance;
         }
 
         private static class Route extends NodeWrapper {
