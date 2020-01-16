@@ -46,6 +46,10 @@ public class Main {
         graph.add(kpo);
         graph.add(lhi);
 
+        while (true) {
+            if (Node.routingTablesAreReady(graph)) break;
+        }
+
         return graph;
     }
 
