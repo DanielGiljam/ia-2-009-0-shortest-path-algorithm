@@ -27,9 +27,32 @@ class Node {
         return neighbours.keySet().toArray(String[]::new);
     }
 
+    String[] getDestinationNames() {
+        return routingTable.keySet().toArray(String[]::new);
+    }
+
     void addNeighbour(final Node node) {
         neighbours.put(node);
         node.neighbours.put(this);
+    }
+
+    void printRouteTo(final String destination) {
+        final RoutingTable.Route route = routingTable.get(destination);
+        if (route.hops.size() == 0) {
+            System.out.println("Du har angett samma ort som starpunkt och destination.");
+            return;
+        } else {
+            int i = 1;
+            System.out.printf("%d. %s%n", i, this.name);
+            i++;
+            final List<Node> hops = new ArrayList<>(route.hops);
+            Collections.reverse(hops);
+            for (final Node hop : hops) {
+                System.out.printf("%d. %s%n", i, hop.name);
+                i++;
+            }
+        }
+        System.out.printf("%nDistans: %.0f km%n", route.distance);
     }
 
     private void broadcastRoutingTable() {
@@ -38,7 +61,7 @@ class Node {
                     RoutingTable neighboursRoutingTable;
                     double distance;
                     List<Node> hops;
-                    for (Neighbours.Neighbour neighbour : neighbours.values()) {
+                    for (final Neighbours.Neighbour neighbour : neighbours.values()) {
                         neighboursRoutingTable = neighbour.node.routingTable;
                         boolean newRoutesWereAdded = false;
                         for (final RoutingTable.Route route : routingTable.values()) {
@@ -57,9 +80,9 @@ class Node {
         );
     }
 
-    static boolean routingTablesAreReady(final List<Node> nodes) {
+    static boolean routingTablesAreReady(final HashMap<String, Node> nodes) {
         boolean ready = true;
-        for (final Node node : nodes) {
+        for (final Node node : nodes.values()) {
             if (node.routingTableBroadcast != null && !node.routingTableBroadcast.isDone()) ready = false;
         }
         return ready;
@@ -126,10 +149,6 @@ class Node {
             private Route(final Node destination, final List<Node> hops, final double distance) {
                 super(destination, distance);
                 this.hops.addAll(hops);
-            }
-
-            Node nextHop() {
-                return !hops.isEmpty() ? hops.get(hops.size() - 1) : null;
             }
         }
     }
