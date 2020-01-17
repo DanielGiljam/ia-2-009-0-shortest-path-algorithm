@@ -1,15 +1,60 @@
 package com.danielgiljam.ia_2_009_0_shortest_path_algorithm;
 
-import java.util.Vector;
+import com.danielgiljam.console_dialogue_api.ConsoleDialogueElement;
+import com.danielgiljam.console_dialogue_api.ConsoleDialogueManager;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class Main {
 
-    public static void main(String[] args) {
-	    final Vector<Node> nodes = createGraph();
-	    showNodesAndLinks(nodes);
+    private static final HashMap<String, Node> NODES = createGraph();
+
+    private static final String HELP_MESSAGE =
+            "Ingen hjälp.\n" +
+            "------------------------------------------------\n" +
+            "v1.0.0\n\n" +
+            "© Daniel Giljam 2020\n" +
+            "Den här kommandotolksappen är licensierad under MIT licensen.";
+
+    private static final ConsoleDialogueElement FROM = new ConsoleDialogueElement(
+            new Runnable() {
+                @Override
+                public void run() {
+                    final Node from = NODES.get(parseInput(FROM.matcher.group(1)));
+                    final List<ConsoleDialogueElement> consoleDialogueElementsLvl2 = new ArrayList<>();
+                    consoleDialogueElementsLvl2.add(new ConsoleDialogueElement(
+                            () -> {
+                                System.out.println(
+                                        "\nKORTASTE RUTT" +
+                                        "\n------------");
+                                from.printRouteTo(parseInput(consoleDialogueElementsLvl2.get(0).matcher.group(1)));
+                                System.out.println("\n------------------------------------------------");
+                            },
+                            createEnumPattern(from.getDestinationNames()),
+                            true
+                    ));
+                    new ConsoleDialogueManager(consoleDialogueElementsLvl2, null, null, "Ange destinationen:", false, false);
+                }
+            },
+            createEnumPattern(NODES.keySet().toArray(String[]::new)),
+            false
+    );
+
+    public static void main(final String[] args) {
+        System.out.println(
+                "\nALLA TÅGSTATIONER SAMT DIREKTA JÄRNVÄGSFÖRBINDELSER TILL ANDRA ORTER" +
+                "\n------------------------------------------------"
+        );
+	    showNodesAndLinks();
+        System.out.println("\n------------------------------------------------");
+        final List<ConsoleDialogueElement> consoleDialogueElements = new ArrayList<>();
+        consoleDialogueElements.add(FROM);
+        new ConsoleDialogueManager(consoleDialogueElements, null, HELP_MESSAGE, "Ange startpunkten:", false, false);
     }
 
-    private static Vector<Node> createGraph() {
+    private static HashMap<String, Node> createGraph() {
 
         final Node hki = new Node("Helsingfors", 60.1640504, 24.7600896);
         final Node tpe = new Node("Tammerfors", 61.6277369, 23.5501169);
@@ -38,13 +83,13 @@ public class Main {
         lhi.addNeighbour(tpe); // Tammerfors
         lhi.addNeighbour(kpo); // Kuopio
 
-        final Vector<Node> graph = new Vector<>();
-        graph.add(hki);
-        graph.add(tpe);
-        graph.add(tku);
-        graph.add(jyv);
-        graph.add(kpo);
-        graph.add(lhi);
+        final HashMap<String, Node> graph = new HashMap<>();
+        graph.put(hki.getName(), hki);
+        graph.put(tpe.getName(), tpe);
+        graph.put(tku.getName(), tku);
+        graph.put(jyv.getName(), jyv);
+        graph.put(kpo.getName(), kpo);
+        graph.put(lhi.getName(), lhi);
 
         while (true) {
             if (Node.routingTablesAreReady(graph)) break;
@@ -53,13 +98,31 @@ public class Main {
         return graph;
     }
 
-    private static void showNodesAndLinks(final Vector<Node> nodes) {
-        for (final Node node : nodes) {
+    private static void showNodesAndLinks() {
+        int count = NODES.size();
+        for (final Node node : NODES.values()) {
             System.out.println(node.getName());
             for (final String neighbourName : node.getNeighbourNames()) {
                 System.out.println("\t" + neighbourName);
             }
-            System.out.println();
+            count--;
+            if (count != 0) System.out.println();
         }
+    }
+
+    private static String createEnumPattern(final String[] values) {
+        int count = values.length;
+        StringBuilder pattern = new StringBuilder("(");
+        for (final String value : values) {
+            pattern.append(value);
+            count--;
+            if (count != 0) pattern.append("|");
+        }
+        pattern.append(")");
+        return pattern.toString();
+    }
+
+    private static String parseInput(final String input) {
+        return input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
     }
 }
